@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {% if auto_refresh %}
+    <meta http-equiv="refresh" content="2" />
+    {% endif %}
+    <title>Orchflow</title>
+    <link rel="stylesheet" href="/static/dashboard.css" />
+  </head>
+  <body>
+    <div class="backdrop"></div>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">localhost orchestration</p>
+          <h1>Orchflow</h1>
+          <p class="lede">Live workflow progress with native dropdowns and notify timestamps in your local time.</p>
+        </div>
+        <div class="hero-badge {% if auto_refresh %}pulse{% endif %}">
+          {% if auto_refresh %}live{% else %}idle{% endif %}
+        </div>
+      </header>
+
+      <section class="panel launchpad">
+        <h2>Launch</h2>
+        <div class="launch-grid">
+          {% for workflow in workflows %}
+          <form class="launch-form" method="post" action="/run/{{ workflow }}">
+            <button type="submit" {% if loop.index is even %}class="accent"{% endif %}>
+              Run {{ workflow }}
+            </button>
+          </form>
+          {% endfor %}
+        </div>
+      </section>
+
+      {% if not runs %}
+      <section class="panel empty">
+        <h2>No runs yet</h2>
+        <p>Start a workflow above. This page auto-refreshes while a run is active.</p>
+      </section>
+      {% endif %}
+
+      {% for run in runs|reverse %}
+      <section class="panel run-card status-{{ run.status }}">
+        <div class="run-head">
+          <div>
+            <h2>{{ run.name }}</h2>
+            <p class="meta">
+              run <code>{{ run.workflow_id[:8] }}</code>
+              · workflow <span class="badge {{ run.status }}">{{ run.status }}</span>
+            </p>
+          </div>
+          {% if run.started_at %}
+          <p class="meta">started <time class="local-time" datetime="{{ run.started_at.isoformat() }}"></time></p>
+          {% endif %}
+        </div>
+
+        <div class="steps">
+          {% for step in run.steps %}
+          <details class="step-drop" {% if step.status == "running" %}open{% endif %}>
+            <summary>
+              <span class="step-title">{{ step.name }}</span>
+              <span class="step-caller">{{ step.caller }}</span>
+              <span class="badge {{ step.status }}">{{ step.status }}</span>
+              {% if step.events %}
+              <time
+                class="local-time summary-time"
+                datetime="{{ step.events[-1].at_iso }}"
+                title="Latest notify"
+              ></time>
+              {% endif %}
+            </summary>
+
+            <div class="step-body">
+              {% if step.depends_on %}
+              <p class="meta">depends on {{ step.depends_on | join(", ") }}</p>
+              {% endif %}
+
+              {% if step.output %}
+              <div class="output-block">
+                <h3>Output</h3>
+                <pre>{{ step.output }}</pre>
+              </div>
+              {% endif %}
+
+              <div class="notify-block">
+                <h3>Notify log</h3>
+                {% if step.events %}
+                <ul class="notify-list">
+                  {% for event in step.events %}
+                  <li>
+                    <span class="badge notify-{{ event.phase }}">{{ event.phase }}</span>
+                    <time class="local-time" datetime="{{ event.at_iso }}"></time>
+                    {% if event.detail %}
+                    <span class="notify-detail">{{ event.detail }}</span>
+                    {% endif %}
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% else %}
+                <p class="meta">No notifications yet.</p>
+                {% endif %}
+              </div>
+            </div>
+          </details>
+          {% endfor %}
+        </div>
+
+        {% if run.report %}
+        <p class="report">{{ run.report }}</p>
+        {% endif %}
+        {% if run.error %}
+        <p class="error">{{ run.error }}</p>
+        {% endif %}
+        {% if run.finished_at %}
+        <p class="meta finished">finished <time class="local-time" datetime="{{ run.finished_at.isoformat() }}"></time></p>
+        {% endif %}
+      </section>
+      {% endfor %}
+    </main>
+
+    <script>
+      for (const el of document.querySelectorAll("time.local-time")) {
+        const iso = el.getAttribute("datetime");
+        if (!iso) continue;
+        const date = new Date(iso);
+        el.textContent = date.toLocaleString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        el.title = date.toLocaleString();
+      }
+    </script>
+  </body>
+</html>

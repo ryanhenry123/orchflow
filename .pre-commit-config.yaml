@@ -27,7 +27,7 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: bash -c "uv sync --extra tests -q && uv run pytest -q"
+        entry: bash -c "uv sync --all-extras -q && uv run pytest -q"
         language: system
         pass_filenames: false
         always_run: true

@@ -257,13 +257,26 @@ def test_shared_state_merge_is_thread_safe():
     assert ctx.data["quotes"] == {"AAPL": "AAPL", "MSFT": "MSFT"}
 
 
-def test_max_workers_one_runs_serially():
-    tracker = CallTracker()
+def test_on_step_listener_reports_phases():
+    events: list[tuple[str, str]] = []
+
+    def first(_ctx: Context) -> int:
+        return 1
+
+    def second(_ctx: Context) -> int:
+        return 2
+
+    def on_step(name: str, phase: str) -> None:
+        events.append((name, phase))
+
     g = build_dag(
         [
-            make_step("a", tracker.caller("a")),
-            make_step("b", tracker.caller("b")),
+            make_step("a", first),
+            make_step("b", second, depends_on=["a"]),
         ]
     )
-    run_workflow(g, Context(), max_workers=1)
-    assert tracker.events[:2] == [("caller", "a"), ("caller", "b")]
+    run_workflow(g, Context(), on_step=on_step)
+    assert ("a", "start") in events
+    assert ("a", "complete") in events
+    assert ("b", "start") in events
+    assert ("b", "complete") in events

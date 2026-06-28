@@ -18,7 +18,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --extra tests
+        run: uv sync --extra tests --extra ui
 
       - name: Run tests
         run: uv run pytest -v
@@ -35,7 +35,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --extra precommit --extra tests
+        run: uv sync --extra precommit --extra tests --extra ui
 
       - name: Run pre-commit
         run: uv run pre-commit run --all-files

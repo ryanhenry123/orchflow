@@ -1,4 +1,5 @@
 import os
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Literal
@@ -9,6 +10,9 @@ from src.dagbuilder import ready_steps
 from src.registry import Context, Step
 
 LOGGER = get_logger(__file__)
+
+StepPhase = Literal["start", "complete", "skip", "error"]
+StepListener = Callable[[str, StepPhase], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,22 +44,31 @@ def _execute_step(name: str, step: Step, ctx: Context) -> _StepOutcome:
         return _StepOutcome(name, "error", exc)
 
 
+def _notify(on_step: StepListener | None, name: str, phase: StepPhase) -> None:
+    if on_step is not None:
+        on_step(name, phase)
+
+
 def _apply_outcome(
     g: nx.DiGraph,
     outcome: _StepOutcome,
     completed: set[str],
     skipped: set[str],
+    on_step: StepListener | None = None,
 ) -> None:
     if outcome.status == "completed":
         completed.add(outcome.name)
+        _notify(on_step, outcome.name, "complete")
         return
 
     if outcome.status == "skipped":
         skipped.add(outcome.name)
         skipped.update(nx.descendants(g, outcome.name))
+        _notify(on_step, outcome.name, "skip")
         return
 
     if outcome.error is not None:
+        _notify(on_step, outcome.name, "error")
         raise outcome.error
 
 
@@ -65,10 +78,12 @@ def _run_batch_serial(
     ctx: Context,
     completed: set[str],
     skipped: set[str],
+    on_step: StepListener | None = None,
 ) -> None:
     for name in batch:
+        _notify(on_step, name, "start")
         step: Step = g.nodes[name]["step"]
-        _apply_outcome(g, _execute_step(name, step, ctx), completed, skipped)
+        _apply_outcome(g, _execute_step(name, step, ctx), completed, skipped, on_step)
 
 
 def _run_batch_parallel(
@@ -78,7 +93,11 @@ def _run_batch_parallel(
     completed: set[str],
     skipped: set[str],
     max_workers: int,
+    on_step: StepListener | None = None,
 ) -> None:
+    for name in batch:
+        _notify(on_step, name, "start")
+
     workers = max(1, min(max_workers, len(batch)))
     with ThreadPoolExecutor(max_workers=workers) as pool:
         outcomes = pool.map(
@@ -86,7 +105,7 @@ def _run_batch_parallel(
             batch,
         )
         for outcome in outcomes:
-            _apply_outcome(g, outcome, completed, skipped)
+            _apply_outcome(g, outcome, completed, skipped, on_step)
 
 
 def run_workflow(
@@ -94,6 +113,7 @@ def run_workflow(
     ctx: Context,
     *,
     max_workers: int | None = None,
+    on_step: StepListener | None = None,
 ) -> Context:
     completed: set[str] = set()
     skipped: set[str] = set()
@@ -106,12 +126,12 @@ def run_workflow(
             raise RuntimeError(err)
 
         if len(batch) == 1 or max_workers == 1:
-            _run_batch_serial(g, batch, ctx, completed, skipped)
+            _run_batch_serial(g, batch, ctx, completed, skipped, on_step)
             continue
 
         workers = (
             max_workers if max_workers is not None else _default_workers(len(batch))
         )
-        _run_batch_parallel(g, batch, ctx, completed, skipped, workers)
+        _run_batch_parallel(g, batch, ctx, completed, skipped, workers, on_step)
 
     return ctx
