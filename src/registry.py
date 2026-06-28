@@ -45,12 +45,12 @@ class WorkflowSpec(BaseModel):
 
     @classmethod
     def load(cls, path: Path) -> Self:
-        pload = safe_load(path.read_text())
-        if isinstance(pload, dict[str, str]):
-            return cls.model_validate(pload)
-        err = f"Type mismatch on pload. Exp: dict[str, str], received: {type(pload)}"
-        LOGGER.error(err)
-        raise TypeError(err)
+        payload = safe_load(path.read_text())
+        if not isinstance(payload, dict):
+            err = f"Type mismatch on workflow payload. Expected dict, received: {type(payload)}"
+            LOGGER.error(err)
+            raise TypeError(err)
+        return cls.model_validate(payload)
 
     def referenced_function_names(self) -> set[str]:
         names: set[str] = set()
@@ -79,9 +79,11 @@ class Step(BaseModel):
             step_name=spec.step_name,
             caller_func=from_registry(spec.caller, Role.CALLER),
             eval_func=from_registry(spec.eval, Role.EVAL) if spec.eval else None,
-            failure_func=from_registry(spec.on_failure, Role.FAILURE)
-            if spec.on_failure
-            else None,
+            failure_func=(
+                from_registry(spec.on_failure, Role.FAILURE)
+                if spec.on_failure
+                else None
+            ),
             depends_on=list(spec.depends_on),
         )
 
