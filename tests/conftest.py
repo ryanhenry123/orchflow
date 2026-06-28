@@ -107,3 +107,17 @@ class CallTracker:
             ctx.data[f"{name}_handled"] = True
 
         return _run
+
+
+@pytest.fixture
+def example_tasks():
+    """Reload example task registrations after registry autouse clear."""
+    import importlib
+    import sys
+
+    if "examples.tasks" not in sys.modules:
+        import examples.tasks  # noqa: F401
+
+    REGISTRY.clear()
+    importlib.reload(sys.modules["examples.tasks"])
+    yield sys.modules["examples.tasks"]
