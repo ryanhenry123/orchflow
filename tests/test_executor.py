@@ -266,7 +266,7 @@ def test_on_step_listener_reports_phases():
     def second(_ctx: Context) -> int:
         return 2
 
-    def on_step(name: str, phase: str) -> None:
+    def on_step(name: str, phase: str, detail: str | None = None) -> None:
         events.append((name, phase))
 
     g = build_dag(

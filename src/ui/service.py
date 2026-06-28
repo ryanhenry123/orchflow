@@ -4,12 +4,13 @@ import importlib
 import json
 import threading
 from pathlib import Path
+from typing import Literal
 
 import networkx as nx
 from src.dagbuilder import build_dag
 from src.executor import StepPhase, run_workflow
 from src.registry import Context, StepRegistry, WorkflowSpec
-from src.ui.store import NotifyPhase, StepStatus, StepView, WorkflowStore
+from src.ui.store import StepStatus, StepView, WorkflowStore
 
 WORKFLOWS_DIR = Path(__file__).resolve().parents[2] / "examples" / "workflows"
 
@@ -31,9 +32,22 @@ MAX_WORKERS: dict[str, int | None] = {
 PHASE_LABELS: dict[StepPhase, str] = {
     "start": "started",
     "complete": "completed",
-    "skip": "skipped",
+    "eval_pass": "eval passed",
+    "eval_fail": "eval failed",
+    "failure_handled": "failure handled",
     "error": "failed",
 }
+
+PHASE_STATUS: dict[StepPhase, StepStatus] = {
+    "start": "running",
+    "complete": "completed",
+    "eval_pass": "running",
+    "eval_fail": "eval_failed",
+    "failure_handled": "handled",
+    "error": "failed",
+}
+
+CASCADE_PHASES: frozenset[StepPhase] = frozenset({"eval_fail", "failure_handled"})
 
 
 def list_workflow_names() -> list[str]:
@@ -57,6 +71,8 @@ def _step_views(spec: WorkflowSpec) -> list[StepView]:
         StepView(
             name=step.step_name,
             caller=step.caller,
+            eval=step.eval,
+            on_failure=step.on_failure,
             depends_on=list(step.depends_on),
         )
         for step in spec.steps
@@ -102,12 +118,7 @@ class WorkflowService:
         return run.workflow_id
 
     def _execute(self, workflow_id: str, spec: WorkflowSpec, task_module: str) -> None:
-        phase_map: dict[StepPhase, StepStatus] = {
-            "start": "running",
-            "complete": "completed",
-            "skip": "skipped",
-            "error": "failed",
-        }
+        step_meta = {step.step_name: step for step in spec.steps}
 
         try:
             self.store.set_status(workflow_id, "running")
@@ -118,36 +129,62 @@ class WorkflowService:
             graph = build_dag(registry.all())
             ctx = Context(data=dict(DEFAULT_CONTEXT.get(spec.name, {})))
 
-            def on_step(step_name: str, phase: StepPhase) -> None:
-                output = None
+            def on_step(
+                step_name: str,
+                phase: StepPhase,
+                error_detail: str | None = None,
+            ) -> None:
+                meta = step_meta.get(step_name)
                 detail = PHASE_LABELS[phase]
+                if phase == "eval_fail" and meta and meta.eval:
+                    detail = f"eval failed ({meta.eval})"
+                elif phase == "failure_handled" and meta and meta.on_failure:
+                    suffix = f": {error_detail}" if error_detail else ""
+                    detail = f"handled by {meta.on_failure}{suffix}"
+                elif phase == "eval_pass" and meta and meta.eval:
+                    detail = f"eval passed ({meta.eval})"
+
+                output = None
                 if phase == "complete":
                     output = _format_output(ctx.get_shared(step_name))
 
-                self.store.set_step_status(workflow_id, step_name, phase_map[phase])
+                self.store.set_step_status(workflow_id, step_name, PHASE_STATUS[phase])
                 self.store.record_notify(
                     workflow_id,
                     step_name,
-                    phase,  # StepPhase values match NotifyPhase for executor events
+                    phase,
                     detail=detail,
                     output=output,
                 )
 
-                if phase == "skip":
+                if phase in CASCADE_PHASES:
                     for downstream in nx.descendants(graph, step_name):
                         self.store.set_step_status(workflow_id, downstream, "skipped")
                         self.store.record_notify(
                             workflow_id,
                             downstream,
                             "inherited_skip",
-                            detail="skipped (upstream step did not pass)",
+                            detail="skipped (upstream branch did not pass)",
                         )
+
+            def on_batch(
+                wave_index: int,
+                steps: list[str],
+                event: Literal["start", "end"],
+            ) -> None:
+                self.store.record_wave(
+                    workflow_id,
+                    wave_index,
+                    steps,
+                    event=event,
+                )
 
             ctx = run_workflow(
                 graph,
                 ctx,
                 max_workers=MAX_WORKERS.get(spec.name),
                 on_step=on_step,
+                on_batch=on_batch,
             )
             self.store.finish(
                 workflow_id,

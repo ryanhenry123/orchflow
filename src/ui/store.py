@@ -6,9 +6,26 @@ from threading import Lock
 from typing import Literal
 from uuid import uuid4
 
-StepStatus = Literal["pending", "running", "completed", "skipped", "failed"]
+StepStatus = Literal[
+    "pending",
+    "running",
+    "completed",
+    "skipped",
+    "failed",
+    "eval_failed",
+    "handled",
+]
 RunStatus = Literal["idle", "running", "completed", "failed"]
-NotifyPhase = Literal["start", "complete", "skip", "error", "inherited_skip"]
+WaveStatus = Literal["running", "completed"]
+NotifyPhase = Literal[
+    "start",
+    "complete",
+    "eval_pass",
+    "eval_fail",
+    "failure_handled",
+    "error",
+    "inherited_skip",
+]
 
 
 @dataclass
@@ -23,10 +40,19 @@ class NotifyEvent:
 
 
 @dataclass
+class WaveView:
+    index: int
+    steps: list[str]
+    status: WaveStatus = "running"
+
+
+@dataclass
 class StepView:
     name: str
     caller: str
     depends_on: list[str]
+    eval: str | None = None
+    on_failure: str | None = None
     status: StepStatus = "pending"
     output: str | None = None
     events: list[NotifyEvent] = field(default_factory=list)
@@ -38,6 +64,7 @@ class WorkflowView:
     name: str
     status: RunStatus = "idle"
     steps: list[StepView] = field(default_factory=list)
+    waves: list[WaveView] = field(default_factory=list)
     error: str | None = None
     report: str | None = None
     started_at: datetime | None = None
@@ -84,6 +111,24 @@ class WorkflowStore:
             run = self._require(workflow_id)
             step = self._find_step(run, step_name)
             step.status = status
+
+    def record_wave(
+        self,
+        workflow_id: str,
+        wave_index: int,
+        steps: list[str],
+        *,
+        event: Literal["start", "end"],
+    ) -> None:
+        with self._lock:
+            run = self._require(workflow_id)
+            if event == "start":
+                run.waves.append(WaveView(index=wave_index, steps=list(steps)))
+                return
+            for wave in reversed(run.waves):
+                if wave.index == wave_index:
+                    wave.status = "completed"
+                    break
 
     def record_notify(
         self,

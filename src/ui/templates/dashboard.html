@@ -3,140 +3,199 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    {% if auto_refresh %}
-    <meta http-equiv="refresh" content="2" />
-    {% endif %}
     <title>Orchflow</title>
-    <link rel="stylesheet" href="/static/dashboard.css" />
+    <link rel="stylesheet" href="/static/dashboard.css?v=6" />
   </head>
-  <body>
-    <div class="backdrop"></div>
-    <main class="shell">
-      <header class="hero">
-        <div>
-          <p class="eyebrow">localhost orchestration</p>
-          <h1>Orchflow</h1>
-          <p class="lede">Live workflow progress with native dropdowns and notify timestamps in your local time.</p>
+  <body
+    data-live="{{ 'true' if auto_refresh else 'false' }}"
+    {% if selected_run_id %}data-selected-run="{{ selected_run_id }}"{% endif %}
+  >
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <p class="eyebrow">pipeline console</p>
+            <h1>Orchflow</h1>
+          </div>
         </div>
-        <div class="hero-badge {% if auto_refresh %}pulse{% endif %}">
-          {% if auto_refresh %}live{% else %}idle{% endif %}
-        </div>
-      </header>
 
-      <section class="panel launchpad">
-        <h2>Launch</h2>
-        <div class="launch-grid">
+        <div class="launch-rail">
+          <span class="launch-label">Launch</span>
           {% for workflow in workflows %}
           <form class="launch-form" method="post" action="/run/{{ workflow }}">
-            <button type="submit" {% if loop.index is even %}class="accent"{% endif %}>
-              Run {{ workflow }}
-            </button>
+            <button type="submit">{{ workflow }}</button>
           </form>
           {% endfor %}
         </div>
-      </section>
 
-      {% if not runs %}
-      <section class="panel empty">
-        <h2>No runs yet</h2>
-        <p>Start a workflow above. This page auto-refreshes while a run is active.</p>
-      </section>
-      {% endif %}
-
-      {% for run in runs|reverse %}
-      <section class="panel run-card status-{{ run.status }}">
-        <div class="run-head">
-          <div>
-            <h2>{{ run.name }}</h2>
-            <p class="meta">
-              run <code>{{ run.workflow_id[:8] }}</code>
-              · workflow <span class="badge {{ run.status }}">{{ run.status }}</span>
-            </p>
-          </div>
-          {% if run.started_at %}
-          <p class="meta">started <time class="local-time" datetime="{{ run.started_at.isoformat() }}"></time></p>
-          {% endif %}
+        <div class="topbar-meta">
+          <button type="button" class="ghost-btn" id="fit-view">Fit</button>
+          <span class="live-badge {% if auto_refresh %}live{% endif %}" id="live-badge">
+            {% if auto_refresh %}live{% else %}idle{% endif %}
+          </span>
         </div>
+      </header>
 
-        <div class="steps">
-          {% for step in run.steps %}
-          <details class="step-drop" {% if step.status == "running" %}open{% endif %}>
-            <summary>
-              <span class="step-title">{{ step.name }}</span>
-              <span class="step-caller">{{ step.caller }}</span>
-              <span class="badge {{ step.status }}">{{ step.status }}</span>
-              {% if step.events %}
-              <time
-                class="local-time summary-time"
-                datetime="{{ step.events[-1].at_iso }}"
-                title="Latest notify"
-              ></time>
-              {% endif %}
-            </summary>
+      <div class="workspace">
+        <div class="viewport" id="viewport">
+          <div class="canvas" id="canvas">
+            <svg class="pipeline-edges" id="pipeline-edges" aria-hidden="true"></svg>
 
-            <div class="step-body">
-              {% if step.depends_on %}
-              <p class="meta">depends on {{ step.depends_on | join(", ") }}</p>
-              {% endif %}
+            {% if not run_pipelines %}
+            <section class="empty-state">
+              <div class="empty-icon" aria-hidden="true"></div>
+              <h2>No pipelines yet</h2>
+              <p>Launch a workflow above. Stages flow left to right; loops show each execution wave.</p>
+            </section>
+            {% endif %}
 
-              {% if step.output %}
-              <div class="output-block">
-                <h3>Output</h3>
-                <pre>{{ step.output }}</pre>
+            {% for item in run_pipelines|reverse %}
+            {% set run = item.run %}
+            {% set layers = item.layers %}
+            <section
+              class="pipeline-run status-{{ run.status }}"
+              data-run-id="{{ run.workflow_id }}"
+              {% if run.started_at %}data-started="{{ run.started_at.isoformat() }}"{% endif %}
+              {% if run.finished_at %}data-finished="{{ run.finished_at.isoformat() }}"{% endif %}
+            >
+              <header class="pipeline-head">
+                <div>
+                  <h2>{{ run.name }}</h2>
+                  <p class="meta">
+                    <code>{{ run.workflow_id[:8] }}</code>
+                    <span class="badge {{ run.status }} run-badge">{{ run.status }}</span>
+                    <span class="run-duration" data-run-duration></span>
+                  </p>
+                  {% set history = run_history.get(run.name, []) %}
+                  {% if history|length > 1 %}
+                  <nav class="run-history" aria-label="{{ run.name }} run history" data-workflow-name="{{ run.name }}">
+                    <a href="/" class="run-link{% if not selected_run_id or run.workflow_id == history[0].workflow_id %} active{% endif %}">latest</a>
+                    {% for hist in history %}
+                    <a
+                      href="/?run={{ hist.workflow_id }}"
+                      class="run-link{% if hist.workflow_id == run.workflow_id %} active{% endif %}"
+                      title="{{ hist.started_at or '' }}"
+                    >
+                      <code>{{ hist.workflow_id[:8] }}</code>
+                    </a>
+                    {% endfor %}
+                  </nav>
+                  {% endif %}
+                </div>
+              </header>
+
+              {% if run.waves %}
+              <div class="wave-rail" aria-label="Execution loops">
+                {% for wave in run.waves %}
+                <button
+                  type="button"
+                  class="wave-chip status-{{ wave.status }}"
+                  data-wave="{{ wave.index }}"
+                  title="Highlight loop {{ wave.index + 1 }}"
+                >
+                  <span class="wave-label">Loop {{ wave.index + 1 }}</span>
+                  <span class="wave-steps">{{ wave.steps | join(" · ") }}</span>
+                </button>
+                {% endfor %}
               </div>
               {% endif %}
 
-              <div class="notify-block">
-                <h3>Notify log</h3>
-                {% if step.events %}
-                <ul class="notify-list">
-                  {% for event in step.events %}
-                  <li>
-                    <span class="badge notify-{{ event.phase }}">{{ event.phase }}</span>
-                    <time class="local-time" datetime="{{ event.at_iso }}"></time>
-                    {% if event.detail %}
-                    <span class="notify-detail">{{ event.detail }}</span>
-                    {% endif %}
-                  </li>
+              <div class="stages-track">
+                {% for layer in layers %}
+                <div class="stage-column">
+                  {% for step in layer %}
+                  <article
+                    class="stage-node status-{{ step.status }}"
+                    data-step="{{ step.name }}"
+                    data-run-id="{{ run.workflow_id }}"
+                    data-depends-on="{{ step.depends_on | join(',') }}"
+                    {% if step.eval %}data-eval="{{ step.eval }}"{% endif %}
+                    {% if step.on_failure %}data-on-failure="{{ step.on_failure }}"{% endif %}
+                    tabindex="0"
+                  >
+                    <div class="stage-node-head">
+                      <span class="stage-icon" aria-hidden="true"></span>
+                      <div class="stage-copy">
+                        <h3>{{ step.name }}</h3>
+                        <p class="stage-caller">{{ step.caller }}</p>
+                        <div class="role-rail">
+                          {% if step.eval %}
+                          <span class="role-chip eval">eval · {{ step.eval }}</span>
+                          {% endif %}
+                          {% if step.on_failure %}
+                          <span class="role-chip failure">fail · {{ step.on_failure }}</span>
+                          {% endif %}
+                        </div>
+                      </div>
+                      <span class="badge {{ step.status }} step-badge">{{ step.status }}</span>
+                    </div>
+                    <template class="stage-details">
+                      <div class="role-rail detail-roles">
+                        {% if step.eval %}
+                        <span class="role-chip eval">eval · {{ step.eval }}</span>
+                        {% endif %}
+                        {% if step.on_failure %}
+                        <span class="role-chip failure">fail · {{ step.on_failure }}</span>
+                        {% endif %}
+                      </div>
+                      {% if step.depends_on %}
+                      <p class="meta">Upstream: {{ step.depends_on | join(", ") }}</p>
+                      {% endif %}
+                      {% if step.output %}
+                      <div class="output-block">
+                        <h4>Output</h4>
+                        <pre>{{ step.output }}</pre>
+                      </div>
+                      {% endif %}
+                      <div class="notify-block">
+                        <h4>Events</h4>
+                        {% if step.events %}
+                        <ul class="notify-list">
+                          {% for event in step.events %}
+                          <li class="event-{{ event.phase }}">
+                            <span class="badge notify-{{ event.phase }}">{{ event.phase }}</span>
+                            <time class="local-time" datetime="{{ event.at_iso }}"></time>
+                            {% if event.detail %}
+                            <span class="notify-detail">{{ event.detail }}</span>
+                            {% endif %}
+                          </li>
+                          {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="meta">Waiting for events.</p>
+                        {% endif %}
+                      </div>
+                    </template>
+                  </article>
                   {% endfor %}
-                </ul>
-                {% else %}
-                <p class="meta">No notifications yet.</p>
+                </div>
+                {% if not loop.last %}
+                <div class="stage-arrow" aria-hidden="true"></div>
                 {% endif %}
+                {% endfor %}
               </div>
-            </div>
-          </details>
-          {% endfor %}
+
+              {% if run.report %}
+              <p class="report">{{ run.report }}</p>
+              {% endif %}
+              {% if run.error %}
+              <p class="error">{{ run.error }}</p>
+              {% endif %}
+            </section>
+            {% endfor %}
+          </div>
         </div>
 
-        {% if run.report %}
-        <p class="report">{{ run.report }}</p>
-        {% endif %}
-        {% if run.error %}
-        <p class="error">{{ run.error }}</p>
-        {% endif %}
-        {% if run.finished_at %}
-        <p class="meta finished">finished <time class="local-time" datetime="{{ run.finished_at.isoformat() }}"></time></p>
-        {% endif %}
-      </section>
-      {% endfor %}
-    </main>
+        <aside class="inspector" id="inspector">
+          <p class="inspector-label">Stage</p>
+          <h2 id="inspector-title">Select a stage</h2>
+          <p class="inspector-meta" id="inspector-meta">Click a stage · ← → move · W cycles loops · Esc clears</p>
+          <div id="inspector-body"></div>
+        </aside>
+      </div>
+    </div>
 
-    <script>
-      for (const el of document.querySelectorAll("time.local-time")) {
-        const iso = el.getAttribute("datetime");
-        if (!iso) continue;
-        const date = new Date(iso);
-        el.textContent = date.toLocaleString(undefined, {
-          year: "numeric",
-          month: "short",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        });
-        el.title = date.toLocaleString();
-      }
-    </script>
+    <script src="/static/dashboard.js?v=6"></script>
   </body>
 </html>
