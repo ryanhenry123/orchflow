@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum, auto
 import inspect
 from types import UnionType
-from typing import Union, get_args, get_origin
+from typing import Union, get_args, get_origin, get_type_hints
 from utils.log import get_logger
 
 LOGGER = get_logger(__file__)
@@ -62,6 +62,7 @@ def validate_signature(func: Callable[..., object], role: Role) -> None:
     contract = ROLE_CONTRACTS[role]
     target = inspect.unwrap(func)
     sig = inspect.signature(target)
+    hints = get_type_hints(target)
     params = [
         p
         for p in sig.parameters.values()
@@ -77,20 +78,22 @@ def validate_signature(func: Callable[..., object], role: Role) -> None:
         LOGGER.error(err)
         raise TypeError(err)
 
-    if role is Role.FAILURE and not _accepts_exception(params[1].annotation):
-        err = (
-            f"{target.__qualname__} failure handler: "
-            f"second param must accept Exception, got {params[1].annotation!r}"
-        )
-        LOGGER.error(err)
-        raise TypeError(err)
+    if role is Role.FAILURE:
+        exc_hint = hints.get(params[1].name, params[1].annotation)
+        if not _accepts_exception(exc_hint):
+            err = (
+                f"{target.__qualname__} failure handler: "
+                f"second param must accept Exception, got {exc_hint!r}"
+            )
+            LOGGER.error(err)
+            raise TypeError(err)
 
-    if contract.return_types and not _return_type_ok(
-        sig.return_annotation, contract.return_types
-    ):
-        err = (
-            f"{target.__qualname__} registered as {role}: "
-            f"return must be {set(contract.return_types)}, got {sig.return_annotation!r}"
-        )
-        LOGGER.error(err)
-        raise TypeError(err)
+    if contract.return_types:
+        return_hint = hints.get("return", sig.return_annotation)
+        if not _return_type_ok(return_hint, contract.return_types):
+            err = (
+                f"{target.__qualname__} registered as {role}: "
+                f"return must be {set(contract.return_types)}, got {return_hint!r}"
+            )
+            LOGGER.error(err)
+            raise TypeError(err)
