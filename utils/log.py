@@ -5,6 +5,7 @@ from utils.enums import LogLevel
 
 _configured = False
 
+
 def configure_logging(level: LogLevel | None = None) -> None:
     global _configured
     if _configured:
@@ -18,11 +19,6 @@ def configure_logging(level: LogLevel | None = None) -> None:
         force=True,
     )
     _configured = True
-
-    # Silence Noisy Libraries
-    noisy_libs_on_debug = ["botocore", "urllib3"]
-    for lib in noisy_libs_on_debug:
-        getLogger(lib).setLevel(WARNING)
 
 
 def get_logger(name: str | None = None) -> Logger:
