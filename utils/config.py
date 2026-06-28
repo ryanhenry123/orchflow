@@ -13,5 +13,5 @@ class EnvConfig(BaseSettings):
     )
     MODELPROVIDERKEY: SecretStr = Field(
         default=SecretStr(""),
-        validation_alias=AliasChoices("MODELPROVIDERKEY", "OPENAI_API_KEY"),
+        validation_alias=AliasChoices("MODELPROVIDERKEY", "OPENAI_API_KEY")
     )
