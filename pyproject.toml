@@ -47,7 +47,9 @@ build-backend = "uv_build"
 dev = [
     "bandit>=1.8.3",
     "black>=26.5.1",
+    "pre-commit>=4.6.0",
     "pytest>=8.4.1",
+    "ruff>=0.15.4",
 ]
 
 [tool.pytest.ini_options]
@@ -57,6 +59,20 @@ pythonpath = ["src"]
 [tool.black]
 line-length = 88
 target-version = ["py311"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501", "SIM108", "SIM117"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"src/orchflow/security/**" = ["S603", "S404"]
+"src/orchflow/providers/aws/bedrock.py" = ["SIM102"]
 
 [tool.uv.build-backend]
 source-exclude = [

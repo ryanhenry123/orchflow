@@ -1,9 +1,8 @@
+from conftest import MockResult
 from orchflow.evals.context import Context
-from orchflow.evals.runwithevals import EvalLoopResult
+from orchflow.evals.runwithevals import run_with_evals
 from orchflow.evals.trace_io import run_result_to_dict, write_run_artifact
 from orchflow.evals.verdict import EvalVerdict
-from orchflow.evals.runwithevals import run_with_evals
-from conftest import MockResult
 
 
 def test_trace_json_roundtrip(tmp_path):

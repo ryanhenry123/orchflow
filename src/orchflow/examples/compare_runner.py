@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 from orchflow.evals.context import Context
-from orchflow.providers.aws.converse_with_evals import (
-    ModelCompareResult,
-    compare_models,
-)
-from orchflow.examples.simple_summary import SYSTEM, draft_prompt
-from orchflow.examples.simple_evals import SIMPLE_EVALS
-from orchflow.examples.trade_memo import load_brief
 from orchflow.examples.evals import DRAFT_EVALS
 from orchflow.examples.prompts import (
     SYSTEM as TRADE_SYSTEM,
+)
+from orchflow.examples.prompts import (
     draft_prompt as trade_draft_prompt,
+)
+from orchflow.examples.simple_evals import SIMPLE_EVALS
+from orchflow.examples.simple_summary import SYSTEM, draft_prompt
+from orchflow.examples.trade_memo import load_brief
+from orchflow.providers.aws.converse_with_evals import (
+    ModelCompareResult,
+    compare_models,
 )
 
 
