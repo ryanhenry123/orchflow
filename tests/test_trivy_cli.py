@@ -38,13 +38,13 @@ def test_run_trivy_passthrough():
 
 
 def test_run_trivy_docker_uses_pinned_image():
-    with patch("orchflow.security.trivy._trivy_bin", return_value=None):
-        with patch(
-            "orchflow.security.trivy.shutil.which", return_value="/usr/bin/docker"
-        ):
-            with patch("orchflow.security.trivy.subprocess.run") as run:
-                run.return_value.returncode = 0
-                run_trivy(use_docker=True, path="/home/ryanh/orchflow")
+    with (
+        patch("orchflow.security.trivy._trivy_bin", return_value=None),
+        patch("orchflow.security.trivy.shutil.which", return_value="/usr/bin/docker"),
+        patch("orchflow.security.trivy.subprocess.run") as run,
+    ):
+        run.return_value.returncode = 0
+        run_trivy(use_docker=True, path="/home/ryanh/orchflow")
     cmd = run.call_args.args[0]
     assert TRIVY_IMAGE in cmd
     assert cmd[0] == "docker"

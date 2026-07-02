@@ -1,7 +1,7 @@
+from conftest import MockResult
 from orchflow.evals.context import Context
 from orchflow.evals.verdict import EvalVerdict
 from orchflow.providers.aws.converse_with_evals import compare_models
-from conftest import MockResult
 
 
 def test_compare_models_ranks_pass_fail(monkeypatch):

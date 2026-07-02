@@ -1,6 +1,6 @@
+from conftest import MockResult
 from orchflow.evals.context import Context
 from orchflow.evals.verdict import EvalVerdict, run_panel
-from conftest import MockResult
 
 
 def ok(_ctx, _result):

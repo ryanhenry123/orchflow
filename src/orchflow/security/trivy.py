@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import shutil
 import subprocess  # nosec B404
-import sys
 from pathlib import Path
 
 TRIVY_IMAGE = (

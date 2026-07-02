@@ -1,7 +1,7 @@
+from conftest import MockResult
 from orchflow.evals.context import Context
 from orchflow.evals.runwithevals import run_with_evals
 from orchflow.evals.verdict import EvalVerdict
-from conftest import MockResult
 
 
 def test_run_with_evals_records_trace():

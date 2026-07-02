@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from orchflow.evals.record import record_output
 from orchflow.evals.runwithevals import EvalLoopResult, MaxTurnsExceeded

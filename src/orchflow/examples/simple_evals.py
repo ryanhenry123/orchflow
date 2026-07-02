@@ -1,4 +1,4 @@
-from orchflow.evals.checks import min_length, word_count
+from orchflow.evals.checks import min_length
 from orchflow.panels import markdown_sections, no_preamble
 
 SIMPLE_EVALS = [

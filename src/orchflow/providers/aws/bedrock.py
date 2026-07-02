@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import typing
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -144,7 +144,7 @@ def render_foundation_catalog_module(
     enums: dict[str, type[StrEnum]],
     by_provider: dict[str, set[str]],
 ) -> str:
-    ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    ts = datetime.now(UTC).isoformat(timespec="seconds")
     enum_body = "\n\n\n".join(render_enum_class(cls) for cls in enums.values())
     links = render_provider_links(by_provider) if by_provider else ""
     return (

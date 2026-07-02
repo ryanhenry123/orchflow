@@ -1,9 +1,8 @@
-import json
 from pathlib import Path
 
-import pytest
 from pydantic import BaseModel
 
+from conftest import MockResult
 from orchflow.evals.checks import (
     fail_on_filter,
     min_length,
@@ -14,7 +13,6 @@ from orchflow.evals.checks import (
 )
 from orchflow.evals.context import Context
 from orchflow.evals.verdict import EvalVerdict, run_panel
-from conftest import MockResult
 
 
 def test_require_sections_passes():

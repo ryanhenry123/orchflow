@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from orchflow.evals.context import Context
 from orchflow.evals.offline import eval_fixture, eval_paths, load_panel
 from orchflow.evals.verdict import EvalVerdict
 from orchflow.examples.evals import DRAFT_EVALS

@@ -1,0 +1,50 @@
+# Local hooks use the project venv via `uv run` (see pyproject.toml dev deps).
+# Install: uv sync --all-groups && uv run pre-commit install
+# Run all:  uv run pre-commit run --all-files
+
+default_install_hook_types: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--unsafe]
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  - repo: local
+    hooks:
+      - id: uv-lock
+        name: uv lock --check
+        entry: uv lock --check
+        language: system
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
+
+      - id: black
+        name: black (uv)
+        entry: uv run black
+        language: system
+        types: [python]
+
+      - id: ruff-check
+        name: ruff check (uv)
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+
+      - id: bandit
+        name: bandit (uv)
+        entry: uv run orchflow bandit
+        language: system
+        pass_filenames: false
+        types: [python]

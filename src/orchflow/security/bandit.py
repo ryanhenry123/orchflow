@@ -81,8 +81,6 @@ def run_bandit(
         )
 
     if not _bandit_available():
-        raise BanditNotFoundError(
-            "bandit not installed. Run: uv sync --all-groups"
-        )
+        raise BanditNotFoundError("bandit not installed. Run: uv sync --all-groups")
 
     return subprocess.run([*_bandit_cmd(), *args], check=False).returncode  # nosec B603
