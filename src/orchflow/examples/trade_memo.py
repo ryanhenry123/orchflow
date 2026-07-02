@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from orchflow import converse_with_evals
 from orchflow.evals.context import Context
+from orchflow.evals.record import record_output
 from orchflow.evals.runwithevals import MaxTurnsExceeded
 from orchflow.examples.evals import DRAFT_EVALS
 from orchflow.examples.prompts import SYSTEM, draft_prompt
@@ -32,7 +35,7 @@ def load_brief(ctx: Context) -> dict:
     }
 
 
-def main() -> None:
+def main(*, record: Path | None = None) -> None:
     ctx = Context(
         topic="Systematic vol selling crowding and tail risk (2024-2026)",
         evidence_years=(2024, 2026),
@@ -43,12 +46,23 @@ def main() -> None:
     ctx["brief"] = load_brief(ctx)
     try:
         out = draft_trade_memo(ctx)
-    except MaxTurnsExceeded:
+    except MaxTurnsExceeded as exc:
+        if record and exc.result.text:
+            record_output(record, exc.result.text)
         raise SystemExit(1) from None
     print(out.result.text)
     print(
         f"\n--- {out.turns} turn(s), {out.result.usage.output_tokens} output tokens ---"
     )
+    if out.trace:
+        for step in out.trace:
+            if step.reasons:
+                print(
+                    f"  turn {step.turn}: {step.verdict.value} — {'; '.join(step.reasons)}"
+                )
+    if record:
+        path = record_output(record, out.result.text)
+        print(f"recorded → {path}")
 
 
 if __name__ == "__main__":

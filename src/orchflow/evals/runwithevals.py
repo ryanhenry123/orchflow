@@ -2,29 +2,47 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from tqdm import tqdm
 
 from orchflow.envconfig import get_settings
 from orchflow.evals.context import Context
+from orchflow.evals.names import output_tokens
 from orchflow.evals.turn import Turn
 from orchflow.evals.types import EvalResult
-from orchflow.evals.verdict import EvalFn, EvalVerdict, run_panel
+from orchflow.evals.verdict import EvalFn, EvalVerdict, PanelReport, run_panel_report
 from orchflow.providers.aws.bedrockruntime import assistant_message
 
 
+@dataclass(frozen=True)
+class TurnTrace:
+    turn: int
+    verdict: EvalVerdict
+    reasons: tuple[str, ...]
+    output_tokens: int | None = None
+    steps: tuple[Any, ...] = ()
+
+
 class EvalFailed(Exception):
-    def __init__(self, result: EvalResult):
+    def __init__(self, result: EvalResult, *, trace: list[TurnTrace] | None = None):
         self.result = result
+        self.trace = trace or []
         super().__init__("eval panel returned FAIL")
 
 
 class MaxTurnsExceeded(Exception):
-    def __init__(self, result: EvalResult, *, max_turns: int):
+    def __init__(
+        self,
+        result: EvalResult,
+        *,
+        max_turns: int,
+        trace: list[TurnTrace] | None = None,
+    ):
         self.result = result
         self.max_turns = max_turns
+        self.trace = trace or []
         super().__init__(f"exceeded max_turns={max_turns}")
 
 
@@ -33,6 +51,17 @@ class EvalLoopResult:
     result: EvalResult
     turns: int
     ctx: Context
+    trace: list[TurnTrace] = field(default_factory=list)
+
+
+def _trace_from_report(turn: int, report: PanelReport, result: EvalResult) -> TurnTrace:
+    return TurnTrace(
+        turn=turn,
+        verdict=report.verdict,
+        reasons=report.reasons,
+        output_tokens=output_tokens(result),
+        steps=report.steps,
+    )
 
 
 def run_with_evals(
@@ -46,6 +75,7 @@ def run_with_evals(
     ctx = Context(ctx or {})
     messages: list[dict[str, Any]] = []
     last: EvalResult | None = None
+    trace: list[TurnTrace] = []
     settings = get_settings()
     label = name or "eval loop"
     pbar = tqdm(
@@ -59,17 +89,18 @@ def run_with_evals(
         pbar.set_postfix_str("calling model...", refresh=False)
         last = call(Turn(turn, messages, ctx.feedback_items))
         messages.append(assistant_message(last.text))
-        verdict, reasons = run_panel(evals, ctx, last)
-        pbar.set_postfix(verdict=verdict.value)
-        if verdict is EvalVerdict.OK:
-            return EvalLoopResult(result=last, turns=turn, ctx=ctx)
-        if verdict is EvalVerdict.FAIL:
-            raise EvalFailed(last)
-        ctx.set_feedback(reasons)
-        if settings.visible_turns and reasons:
-            pbar.write("  retry: " + "; ".join(reasons))
+        report = run_panel_report(evals, ctx, last)
+        trace.append(_trace_from_report(turn, report, last))
+        pbar.set_postfix(verdict=report.verdict.value)
+        if report.verdict is EvalVerdict.OK:
+            return EvalLoopResult(result=last, turns=turn, ctx=ctx, trace=trace)
+        if report.verdict is EvalVerdict.FAIL:
+            raise EvalFailed(last, trace=trace)
+        ctx.set_feedback(list(report.reasons))
+        if settings.visible_turns and report.reasons:
+            pbar.write("  retry: " + "; ".join(report.reasons))
         if turn == max_turns:
             if settings.print_last_draft:
                 print(last.text, file=sys.stderr)
-            raise MaxTurnsExceeded(last, max_turns=max_turns)
+            raise MaxTurnsExceeded(last, max_turns=max_turns, trace=trace)
     raise RuntimeError("unreachable")

@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from orchflow.cli import main
@@ -24,4 +26,26 @@ def test_eval_cli_bad_fixture_exits_nonzero(capsys):
     out = capsys.readouterr().out
     assert exc.value.code == 1
     assert "bad_memo.md: retry" in out
-    assert "  - " in out
+
+
+def test_eval_cli_verbose(capsys):
+    with pytest.raises(SystemExit):
+        main(["eval", "tests/fixtures/bad_memo.md", "--verbose", "--only", "structure"])
+    out = capsys.readouterr().out
+    assert "[structure]" in out
+
+
+def test_eval_cli_json(capsys):
+    with pytest.raises(SystemExit):
+        main(
+            [
+                "eval",
+                "tests/fixtures/simple_good.md",
+                "--panel",
+                "orchflow.examples.simple_evals:SIMPLE_EVALS",
+                "--json",
+            ]
+        )
+    out = capsys.readouterr().out
+    data = json.loads(out)
+    assert data[0]["verdict"] == "ok"

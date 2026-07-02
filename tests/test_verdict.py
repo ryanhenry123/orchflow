@@ -37,17 +37,21 @@ def test_panel_collects_multiple_retry_reasons():
         c.feedback("second")
         return EvalVerdict.RETRY
 
+    a.__eval_name__ = "a"
+    b.__eval_name__ = "b"
+
     verdict, reasons = run_panel([a, b], ctx, MockResult("x"))
     assert verdict is EvalVerdict.RETRY
-    assert reasons == ["first", "second"]
+    assert reasons == ["a: first", "b: second"]
 
 
 def test_panel_fail_stops_early():
+    retry_with_feedback.__eval_name__ = "retry_with_feedback"
     verdict, reasons = run_panel(
         [retry_with_feedback, fail], Context(), MockResult("x")
     )
     assert verdict is EvalVerdict.FAIL
-    assert reasons == ["too short"]
+    assert reasons == ["retry_with_feedback: too short"]
 
 
 def test_panel_retry_without_feedback_gets_default_reason():

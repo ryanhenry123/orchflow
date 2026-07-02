@@ -1,12 +1,24 @@
 [project]
 name = "orchflow"
-version = "0.1.0"
-description = "Composable quality gates for Bedrock scripts — call, eval, retry."
+version = "0.2.0"
+description = "Quality gates and retry loops for Amazon Bedrock Converse."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "RyanHenry", email = "ryandhenry.12@gmail.com" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.11"
+keywords = ["bedrock", "aws", "converse", "eval", "retry", "llm", "quality-gates"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+]
 dependencies = [
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
@@ -21,6 +33,11 @@ aws = [
     "boto3>=1.43.39",
     "boto3-stubs[bedrock,bedrock-runtime]>=1.43.39",
 ]
+
+[project.urls]
+Homepage = "https://github.com/ryanhenry123/orchflow"
+Repository = "https://github.com/ryanhenry123/orchflow"
+Documentation = "https://github.com/ryanhenry123/orchflow#readme"
 
 [build-system]
 requires = ["uv_build>=0.11.25,<0.12.0"]
@@ -38,4 +55,4 @@ pythonpath = ["src"]
 
 [tool.black]
 line-length = 88
-target-version = ["py313"]
+target-version = ["py311"]
