@@ -25,3 +25,4 @@ All notable changes to this project are documented here.
 - PEP 561 marker (`py.typed`) and `bedrockflow.__version__`.
 - Generated Bedrock catalog and dev shell scripts excluded from published wheels.
 - PyPI distribution name **`bedrockflow`** (`import bedrockflow`; CLI `bedrockflow`). The name `orchflow` is taken on PyPI by an unrelated multi-agent orchestration library.
+- Tag-based publish workflow: `.github/workflows/publish-pypi.yml` (OIDC trusted publishing).

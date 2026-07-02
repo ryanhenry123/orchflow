@@ -111,6 +111,9 @@ uv run black --check .
 
 See [docs/LAUNCH.md](docs/LAUNCH.md) and [CHANGELOG.md](CHANGELOG.md).
 
+Releases publish via GitHub Actions on version tags (trusted publishing — no tokens in secrets):
+
 ```bash
-uv build && uv publish
+git tag -a v0.3.0 -m "Release v0.3.0"
+git push origin v0.3.0
 ```
