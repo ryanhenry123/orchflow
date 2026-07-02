@@ -4,7 +4,16 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field
-from botocore.config import Config
+
+from orchflow.providers.aws.messages import (
+    ConversationRole,
+    assistant_message,
+    cache_point,
+    cached_user_message,
+    system_block,
+    text_block,
+    user_message,
+)
 
 if TYPE_CHECKING:
     from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
@@ -20,6 +29,7 @@ def get_client(
     if CLIENT is None:
         try:
             from boto3 import client
+            from botocore.config import Config
         except ImportError as e:
             raise ImportError(
                 "AWS support requires boto3. Install with: pip install orchflow[aws]"
@@ -35,10 +45,6 @@ def get_client(
     return CLIENT
 
 
-class ConversationRole(StrEnum):
-    USER, ASSISTANT = "user", "assistant"
-
-
 class StopReason(StrEnum):
     END_TURN = "end_turn"
     MAX_TOKENS = "max_tokens"
@@ -47,35 +53,6 @@ class StopReason(StrEnum):
     CONTENT_FILTERED = "content_filtered"
     GUARDRAIL_INTERVENED = "guardrail_intervened"
     MODEL_CONTEXT_WINDOW_EXCEEDED = "model_context_window_exceeded"
-
-
-def text_block(text: str) -> dict[str, str]:
-    return {"text": text}
-
-
-def cache_point() -> dict[str, dict[str, str]]:
-    return {"cachePoint": {"type": "default"}}
-
-
-system_block = text_block
-user_message = lambda text: {
-    "role": ConversationRole.USER,
-    "content": [text_block(text)],
-}
-
-
-def cached_user_message(text: str) -> dict[str, Any]:
-    """User message with a Bedrock prompt-cache breakpoint after ``text``."""
-    return {
-        "role": ConversationRole.USER,
-        "content": [text_block(text), cache_point()],
-    }
-
-
-assistant_message = lambda text: {
-    "role": ConversationRole.ASSISTANT,
-    "content": [text_block(text)],
-}
 
 
 class _ApiModel(BaseModel):

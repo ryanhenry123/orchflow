@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 EXAMPLES = {
@@ -49,8 +50,8 @@ def build_parser() -> argparse.ArgumentParser:
     eval_p.add_argument("paths", nargs="+", help="Fixture files or directories")
     eval_p.add_argument(
         "--panel",
-        default="orchflow.examples.evals:DRAFT_EVALS",
-        help="Eval panel as module.path:ATTRIBUTE",
+        default="orchflow.examples.simple_evals:SIMPLE_EVALS",
+        help="Eval panel as module.path:ATTRIBUTE (imports arbitrary Python — trusted use only)",
     )
     eval_p.add_argument("--ctx", default=None, help="JSON context passed to evals")
     eval_p.add_argument(
@@ -114,6 +115,99 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         dest="as_json",
         help="Emit JSON comparison table",
+    )
+
+    trivy_p = sub.add_parser(
+        "trivy",
+        help="Run Trivy vulnerability scanner (fs scan by default)",
+    )
+    trivy_p.add_argument(
+        "trivy_args",
+        nargs="*",
+        help="Optional args passed to trivy (e.g. fs . --format json)",
+    )
+    trivy_p.add_argument(
+        "--path",
+        default=".",
+        help="Scan path for default filesystem scan (default: .)",
+    )
+    trivy_p.add_argument(
+        "--severity",
+        default="HIGH,CRITICAL",
+        help="Severities for default scan",
+    )
+    trivy_p.add_argument(
+        "--scanners",
+        default="vuln,secret,misconfig",
+        help="Scanners for default scan",
+    )
+    trivy_p.add_argument(
+        "--format",
+        default="table",
+        dest="trivy_format",
+        help="Output format for default scan",
+    )
+    trivy_p.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Output file for default scan",
+    )
+    trivy_p.add_argument(
+        "--ignore-file",
+        type=Path,
+        default=None,
+        help="Trivy ignore file (default: .trivyignore)",
+    )
+    trivy_p.add_argument(
+        "--exit-code",
+        type=int,
+        default=1,
+        help="Trivy exit code when vulnerabilities found (default: 1)",
+    )
+    trivy_p.add_argument(
+        "--docker",
+        action="store_true",
+        help="Run pinned aquasec/trivy image via docker instead of local binary",
+    )
+
+    bandit_p = sub.add_parser(
+        "bandit",
+        help="Run Bandit Python security linter (src scan by default)",
+    )
+    bandit_p.add_argument(
+        "bandit_args",
+        nargs="*",
+        help="Optional args passed to bandit (e.g. -r src -f json)",
+    )
+    bandit_p.add_argument(
+        "--path",
+        default="src/orchflow",
+        help="Scan path for default recursive scan (default: src/orchflow)",
+    )
+    bandit_p.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Bandit config file (default: .github/bandit.yaml)",
+    )
+    bandit_p.add_argument(
+        "--severity",
+        choices=["low", "medium", "high"],
+        default="low",
+        help="Minimum severity for default scan (default: low)",
+    )
+    bandit_p.add_argument(
+        "--format",
+        default="txt",
+        dest="bandit_format",
+        help="Output format for default scan",
+    )
+    bandit_p.add_argument(
+        "--exit-code",
+        type=int,
+        default=1,
+        help="Exit code when issues found (default: 1; use 0 for --exit-zero)",
     )
 
     return parser
@@ -190,13 +284,49 @@ def main(argv: list[str] | None = None) -> None:
             print(format_compare_rows(rows))
         raise SystemExit(0 if all(r.passed for r in rows) else 1)
 
-    if args.command == "run" or args.command is None:
-        example = getattr(args, "example", "trade_memo")
-        run_main = _import_main(EXAMPLES[example])
+    if args.command == "trivy":
+        from orchflow.security.trivy import TrivyNotFoundError, run_trivy
+
+        try:
+            code = run_trivy(
+                args.trivy_args or None,
+                path=args.path,
+                severity=args.severity,
+                scanners=args.scanners,
+                fmt=args.trivy_format,
+                output=args.output,
+                ignore_file=args.ignore_file,
+                exit_code=args.exit_code,
+                use_docker=args.docker,
+            )
+        except TrivyNotFoundError as exc:
+            print(exc, file=sys.stderr)
+            raise SystemExit(127) from None
+        raise SystemExit(code)
+
+    if args.command == "bandit":
+        from orchflow.security.bandit import BanditNotFoundError, run_bandit
+
+        try:
+            code = run_bandit(
+                args.bandit_args or None,
+                path=args.path,
+                config=args.config,
+                severity=args.severity,
+                fmt=args.bandit_format,
+                exit_code=args.exit_code,
+            )
+        except BanditNotFoundError as exc:
+            print(exc, file=sys.stderr)
+            raise SystemExit(127) from None
+        raise SystemExit(code)
+
+    if args.command == "run":
+        run_main = _import_main(EXAMPLES[args.example])
         run_main(
-            record=getattr(args, "record", None),
-            trace=getattr(args, "trace", None),
-            cache_initial=getattr(args, "cache_initial", False),
+            record=args.record,
+            trace=args.trace,
+            cache_initial=args.cache_initial,
         )
         return
 

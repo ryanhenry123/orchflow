@@ -13,8 +13,8 @@ class EnvConfig(BaseSettings):
         extra="ignore",
     )
 
-    visible_turns: bool = True
-    print_last_draft: bool = True
+    visible_turns: bool = False
+    print_last_draft: bool = False
 
 
 @lru_cache

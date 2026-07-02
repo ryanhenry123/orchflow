@@ -13,7 +13,6 @@ from orchflow.evals.names import output_tokens
 from orchflow.evals.turn import Turn
 from orchflow.evals.types import EvalResult
 from orchflow.evals.verdict import EvalFn, EvalVerdict, PanelReport, run_panel_report
-from orchflow.providers.aws.bedrockruntime import assistant_message
 
 
 def _usage_field(result: EvalResult, field: str) -> int | None:
@@ -86,7 +85,7 @@ def run_with_evals(
     name: str | None = None,
 ) -> EvalLoopResult:
     ctx = Context(ctx or {})
-    messages: list[dict[str, Any]] = []
+    drafts: list[str] = []
     last: EvalResult | None = None
     trace: list[TurnTrace] = []
     settings = get_settings()
@@ -100,8 +99,8 @@ def run_with_evals(
     )
     for turn in pbar:
         pbar.set_postfix_str("calling model...", refresh=False)
-        last = call(Turn(turn, messages, ctx.feedback_items))
-        messages.append(assistant_message(last.text))
+        last = call(Turn(turn, drafts, ctx.feedback_items))
+        drafts.append(last.text)
         report = run_panel_report(evals, ctx, last)
         trace.append(_trace_from_report(turn, report, last))
         pbar.set_postfix(verdict=report.verdict.value)

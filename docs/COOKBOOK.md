@@ -2,6 +2,10 @@
 
 Copy-paste recipes for common Bedrock output gates.
 
+- Base install (`pip install orchflow`): offline panels and `orchflow eval` — no AWS credentials.
+- Live Bedrock loops: `pip install "orchflow[aws]"` plus configured credentials.
+- Retry progress bars: opt in with `ORCHFLOW_VISIBLE_TURNS=1` (and `ORCHFLOW_PRINT_LAST_DRAFT=1` for stderr dumps).
+
 ## 1. JSON extraction
 
 ```python

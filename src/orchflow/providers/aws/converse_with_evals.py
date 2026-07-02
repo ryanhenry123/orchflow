@@ -13,10 +13,8 @@ from orchflow.evals.runwithevals import (
 )
 from orchflow.evals.trace_io import run_result_to_dict, token_summary, write_trace
 from orchflow.evals.verdict import EvalFn
-from orchflow.providers.aws.bedrockruntime import (
-    InferenceConfig,
-    converse,
-)
+from orchflow.providers.aws.bedrockruntime import InferenceConfig, converse
+from orchflow.providers.aws.messages import build_converse_messages
 
 InitialFn = Callable[[Context], str]
 
@@ -58,7 +56,8 @@ def converse_with_evals(
     def call(turn):
         return converse(
             model_id,
-            turn.build(
+            build_converse_messages(
+                turn,
                 initial=_resolve_initial(initial, ctx),
                 cache_initial=cache_initial,
             ),

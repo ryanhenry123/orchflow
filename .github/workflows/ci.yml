@@ -9,9 +9,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@4db96194c378173c656ce18a155ffc14a9fc4355 # v5.2.2
         with:
           enable-cache: true
 
@@ -24,12 +24,39 @@ jobs:
       - name: Pytest
         run: uv run pytest
 
+  install-base:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: astral-sh/setup-uv@4db96194c378173c656ce18a155ffc14a9fc4355 # v5.2.2
+        with:
+          enable-cache: true
+
+      - name: Build wheel
+        run: uv build
+
+      - name: Install wheel without extras
+        run: |
+          uv venv /tmp/base-venv
+          uv pip install --python /tmp/base-venv/bin/python dist/orchflow-*.whl
+
+      - name: Smoke import
+        run: |
+          /tmp/base-venv/bin/python -c \
+            "from orchflow import markdown_sections, __version__; print(__version__, len(markdown_sections('## Summary')))"
+
+      - name: Smoke offline eval CLI
+        run: |
+          /tmp/base-venv/bin/orchflow eval tests/fixtures/simple/good.md \
+            --panel orchflow.examples.simple_evals:SIMPLE_EVALS
+
   fixture-eval:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@4db96194c378173c656ce18a155ffc14a9fc4355 # v5.2.2
         with:
           enable-cache: true
 
@@ -39,6 +66,7 @@ jobs:
       - name: Gate trade memo fixtures
         run: |
           uv run orchflow eval tests/fixtures/trade_memo/good_memo.md \
+            --panel orchflow.examples.evals:DRAFT_EVALS \
             --ctx '{"evidence_years":[2024,2026],"max_words":600,"min_words":100,"min_trades":1}' \
             --report eval-report-trade.json
 
@@ -49,7 +77,7 @@ jobs:
             --report eval-report-simple.json
 
       - name: Upload eval reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         if: always()
         with:
           name: eval-reports

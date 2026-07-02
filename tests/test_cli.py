@@ -14,7 +14,14 @@ TRADE_CTX = (
 def test_eval_cli_good_fixture(capsys):
     with pytest.raises(SystemExit) as exc:
         main(
-            ["eval", str(FIXTURES / "trade_memo" / "good_memo.md"), "--ctx", TRADE_CTX]
+            [
+                "eval",
+                str(FIXTURES / "trade_memo" / "good_memo.md"),
+                "--panel",
+                "orchflow.examples.evals:DRAFT_EVALS",
+                "--ctx",
+                TRADE_CTX,
+            ]
         )
     out = capsys.readouterr().out
     assert exc.value.code == 0
@@ -23,7 +30,14 @@ def test_eval_cli_good_fixture(capsys):
 
 def test_eval_cli_bad_fixture_exits_nonzero(capsys):
     with pytest.raises(SystemExit) as exc:
-        main(["eval", str(FIXTURES / "trade_memo" / "bad_memo.md")])
+        main(
+            [
+                "eval",
+                str(FIXTURES / "trade_memo" / "bad_memo.md"),
+                "--panel",
+                "orchflow.examples.evals:DRAFT_EVALS",
+            ]
+        )
     out = capsys.readouterr().out
     assert exc.value.code == 1
     assert "bad_memo.md: retry" in out
@@ -35,6 +49,8 @@ def test_eval_cli_verbose(capsys):
             [
                 "eval",
                 str(FIXTURES / "trade_memo" / "bad_memo.md"),
+                "--panel",
+                "orchflow.examples.evals:DRAFT_EVALS",
                 "--verbose",
                 "--only",
                 "structure",
@@ -67,6 +83,8 @@ def test_eval_report_file(tmp_path: Path):
             [
                 "eval",
                 str(FIXTURES / "trade_memo" / "good_memo.md"),
+                "--panel",
+                "orchflow.examples.evals:DRAFT_EVALS",
                 "--ctx",
                 TRADE_CTX,
                 "--report",
@@ -77,3 +95,9 @@ def test_eval_report_file(tmp_path: Path):
     assert report.exists()
     data = json.loads(report.read_text())
     assert data[0]["verdict"] == "ok"
+
+
+def test_cli_requires_subcommand():
+    with pytest.raises(SystemExit) as exc:
+        main([])
+    assert exc.value.code == 2

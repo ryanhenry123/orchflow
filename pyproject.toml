@@ -45,6 +45,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "bandit>=1.8.3",
     "black>=26.5.1",
     "pytest>=8.4.1",
 ]
@@ -56,3 +57,13 @@ pythonpath = ["src"]
 [tool.black]
 line-length = 88
 target-version = ["py311"]
+
+[tool.uv.build-backend]
+source-exclude = [
+    "**/_gen_foundation_catalog.py",
+    "**/examples/run.sh",
+]
+wheel-exclude = [
+    "**/_gen_foundation_catalog.py",
+    "**/examples/run.sh",
+]

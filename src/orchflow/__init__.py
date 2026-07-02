@@ -1,5 +1,7 @@
 """Bedrock-native eval loop: call a model, run quality gates, retry with feedback."""
 
+from importlib.metadata import PackageNotFoundError, version
+
 from orchflow.evals.checks import (
     fail_on_filter,
     matches,
@@ -24,6 +26,11 @@ from orchflow.evals.turn import Turn
 from orchflow.evals.types import EvalResult
 from orchflow.evals.verdict import EvalFn, EvalStep, EvalVerdict, PanelReport, run_panel
 from orchflow.panels import csv_table, json_object, markdown_sections, no_preamble
+
+try:
+    __version__ = version("orchflow")
+except PackageNotFoundError:
+    __version__ = "0.3.0"
 
 
 def converse_with_evals(*args, **kwargs):
@@ -50,6 +57,7 @@ __all__ = [
     "PanelReport",
     "Turn",
     "TurnTrace",
+    "__version__",
     "compare_models",
     "converse_with_evals",
     "csv_table",

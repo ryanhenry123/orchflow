@@ -1,0 +1,10 @@
+# Bandit config for orchflow (see: orchflow bandit)
+exclude_dirs:
+  - tests
+  - .venv
+  - build
+  - dist
+  - .git
+
+skips:
+  - B101 # assert_used (tests excluded; harmless in library code)
